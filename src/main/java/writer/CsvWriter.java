@@ -1,40 +1,92 @@
 package writer;
 
-import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
+import annotations.ColumnName;
 import annotations.Ignore;
 import annotations.Mask;
+import annotations.TargetSuperClass;
+import writer.base.ICsvWriter;
 
-/**
- * CSV書き込みクラス
- * 
- * @author k.urakawa
- *
- */
-public class CsvWriter {
+public class CsvWriter implements ICsvWriter {
 
 	/**
-	 * 指定された文字コードでcsv形式の文字列を作成
+	 * ヘッダを書き込む
 	 * 
-	 * @param <T>
 	 * @param obj
-	 * @param cs
 	 * @return
-	 * @throws IOException
 	 */
-	public static <T> String write(T obj, Charset cs) throws IOException {
+	@Override
+	public String writeHeader(Object obj) {
 		Objects.requireNonNull(obj);
-		final Field[] fArray = getField(obj);
+		final List<Field> fList = getField(obj.getClass());
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < fArray.length; i++) {
-			Field f = fArray[i];
+		for (int i = 0; i < fList.size(); i++) {
+			Field f = fList.get(i);
+			if (isTargetField(f)) {
+				f.setAccessible(true);
+				String name = f.getName();
+				if (i != 0) {
+					sb.append(",");
+				}
+				sb.append("\"");
+				name = columnName(f, name);
+				sb.append(name);
+				sb.append("\"");
+				f.setAccessible(false);
+			}
+		}
+		sb.append("\n");
+		return sb.toString();
+	}
+
+	@Override
+	public String write(Object obj) {
+		Objects.requireNonNull(obj);
+		final List<Field> fList = getField(obj.getClass());
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < fList.size(); i++) {
+			Field f = fList.get(i);
+			if (isTargetField(f)) {
+				f.setAccessible(true);
+				String name = f.getName();
+				if (i != 0) {
+					sb.append(",");
+				}
+				sb.append("\"");
+				name = columnName(f, name);
+				sb.append(name);
+				sb.append("\"");
+				f.setAccessible(false);
+			}
+		}
+		sb.append("\n");
+		return sb.toString();
+	}
+
+	@Override
+	public String write(Object obj, Charset cs) {
+		return new String(writeByte(obj, cs), cs);
+	}
+
+	@Override
+	public byte[] writeByte(Object obj, Charset cs) {
+		Objects.requireNonNull(obj);
+		final List<Field> fList = getField(obj.getClass());
+		StringBuilder sb = new StringBuilder(writeHeader(obj));
+		for (int i = 0; i < fList.size(); i++) {
+			Field f = fList.get(i);
 			if (isTargetField(f)) {
 				f.setAccessible(true);
 				try {
@@ -43,7 +95,7 @@ public class CsvWriter {
 						sb.append(",");
 					}
 					sb.append("\"");
-					value = Objects.isNull(value) ? "" : CsvWriter.mask(f, value);
+					value = Objects.isNull(value) ? "" : mask(f, value);
 					sb.append(value);
 					sb.append("\"");
 				} catch (ReflectiveOperationException e) {
@@ -52,39 +104,27 @@ public class CsvWriter {
 				f.setAccessible(false);
 			}
 		}
-		return new String(CsvWriter.encode(cs, sb.toString()), cs);
+		return encode(cs, sb.toString());
 	}
-
-	/**
-	 * 実行環境のデフォルト文字コードでcsv形式の文字列を作成
-	 * 
-	 * @param <T>
-	 * @param obj
-	 * @return
-	 * @throws IOException
-	 */
-	public static <T> String write(T obj) throws IOException {
-		System.out.println(System.getProperty("file.encoding"));
-		return CsvWriter.write(obj, Charset.forName(System.getProperty("file.encoding")));
-	}
-
-	/**
-	 * 指定された文字コードでエンコード
-	 * 
-	 * @param cs
-	 * @param text
-	 * @return
-	 * @throws IOException
-	 */
-	private static byte[] encode(Charset cs, String text) throws IOException {
+	
+	@Override
+	public byte[] encode(Charset cs, String text) {
+		Objects.requireNonNull(cs);
 		CharsetEncoder csEncoder = cs.newEncoder();
 		ByteBuffer bytebuffer;
-		bytebuffer = csEncoder.encode(CharBuffer.wrap(text));
-		byte[] bytes = new byte[bytebuffer.limit()];
-		bytebuffer.get(bytes);
-		return bytes;
+		try {
+			bytebuffer = csEncoder.encode(CharBuffer.wrap(text));
+			byte[] bytes = new byte[bytebuffer.limit()];
+			bytebuffer.get(bytes);
+			return bytes;
+		} catch (CharacterCodingException e) {
+			// TODO 自動生成された catch ブロック
+			e.printStackTrace();
+		}
+		// 到達不可能
+		return null;
 	}
-
+	
 	/**
 	 * フィールドを取得
 	 * 
@@ -92,8 +132,16 @@ public class CsvWriter {
 	 * @param obj
 	 * @return
 	 */
-	private static <T> Field[] getField(T obj) {
-		return obj.getClass().getDeclaredFields();
+	protected List<Field> getField(Class<?> clazz, Field... fields) {
+		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
+				: new ArrayList<Field>(Arrays.asList(fields));
+		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
+		if (!isAnnotationNotExist(clazz, TargetSuperClass.class)) {
+			if (!Object.class.equals(clazz.getSuperclass())) {
+				return getField(clazz.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
+			}
+		}
+		return fieldList;
 	}
 
 	/**
@@ -102,8 +150,8 @@ public class CsvWriter {
 	 * @param f
 	 * @return
 	 */
-	private static boolean isTargetField(Field f) {
-		return CsvWriter.isAnnotationNotExist(f, Ignore.class);
+	protected boolean isTargetField(Field f) {
+		return isAnnotationNotExist(f, Ignore.class);
 	}
 
 	/**
@@ -113,9 +161,33 @@ public class CsvWriter {
 	 * @param value
 	 * @return
 	 */
-	private static Object mask(Field f, Object value) {
-		Mask mask = CsvWriter.getAnnotation(f, Mask.class);
+	protected Object mask(Field f, Object value) {
+		Mask mask = getAnnotation(f, Mask.class);
 		return Objects.isNull(mask) ? value : mask.value();
+	}
+
+	/**
+	 * カラム名を取得
+	 * 
+	 * @param f
+	 * @param value
+	 * @return
+	 */
+	protected String columnName(Field f, String value) {
+		ColumnName columnName = getAnnotation(f, ColumnName.class);
+		return Objects.isNull(columnName) ? value : columnName.value();
+	}
+
+	/**
+	 * クラスにアノテーションが設定されているか判定
+	 * 
+	 * @param <T>
+	 * @param f
+	 * @param annotationClazz
+	 * @return
+	 */
+	protected <T extends Annotation> boolean isAnnotationNotExist(Class<?> clazz, Class<T> annotationClazz) {
+		return Objects.isNull(clazz.getAnnotation(annotationClazz));
 	}
 
 	/**
@@ -126,8 +198,9 @@ public class CsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	private static <T extends Annotation> boolean isAnnotationNotExist(Field f, Class<T> annotationClazz) {
-		return Objects.isNull(f.getAnnotation(annotationClazz));
+	protected <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao,
+			Class<T> annotationClazz) {
+		return Objects.isNull(ao.getAnnotation(annotationClazz));
 	}
 
 	/**
@@ -138,8 +211,8 @@ public class CsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	private static <T extends Annotation> T getAnnotation(Field f, Class<T> annotationClazz) {
-		return f.getAnnotation(annotationClazz);
+	protected <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
+		return ao.getAnnotation(annotationClazz);
 	}
 
 }
