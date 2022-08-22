@@ -28,9 +28,9 @@ public class CsvWriter implements ICsvWriter {
 	 * @return
 	 */
 	@Override
-	public String writeHeader(Object obj) {
-		Objects.requireNonNull(obj);
-		final List<Field> fList = getField(obj.getClass());
+	public String writeHeader(Class<?> clazz) {
+		Objects.requireNonNull(clazz);
+		final List<Field> fList = getField(clazz);
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < fList.size(); i++) {
 			Field f = fList.get(i);
@@ -84,7 +84,7 @@ public class CsvWriter implements ICsvWriter {
 	public byte[] writeByte(Object obj, Charset cs) {
 		Objects.requireNonNull(obj);
 		final List<Field> fList = getField(obj.getClass());
-		StringBuilder sb = new StringBuilder(writeHeader(obj));
+		StringBuilder sb = new StringBuilder(writeHeader(obj.getClass()));
 		for (int i = 0; i < fList.size(); i++) {
 			Field f = fList.get(i);
 			if (isTargetField(f)) {
@@ -106,7 +106,7 @@ public class CsvWriter implements ICsvWriter {
 		}
 		return encode(cs, sb.toString());
 	}
-	
+
 	@Override
 	public byte[] encode(Charset cs, String text) {
 		Objects.requireNonNull(cs);
@@ -124,7 +124,7 @@ public class CsvWriter implements ICsvWriter {
 		// 到達不可能
 		return null;
 	}
-	
+
 	/**
 	 * フィールドを取得
 	 * 
@@ -198,8 +198,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	protected <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao,
-			Class<T> annotationClazz) {
+	protected <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao, Class<T> annotationClazz) {
 		return Objects.isNull(ao.getAnnotation(annotationClazz));
 	}
 
@@ -213,6 +212,24 @@ public class CsvWriter implements ICsvWriter {
 	 */
 	protected <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
 		return ao.getAnnotation(annotationClazz);
+	}
+
+	@Override
+	public <T> String write(List<T> obj) {
+		final StringBuilder sb = new StringBuilder();
+		for (T element : obj) {
+			sb.append(write(element));
+		}
+		return sb.toString();
+	}
+
+	@Override
+	public <T> String write(List<T> obj, Charset cs) {
+		final StringBuilder sb = new StringBuilder();
+		for (T element : obj) {
+			sb.append(write(element, cs));
+		}
+		return sb.toString();
 	}
 
 }
