@@ -47,7 +47,7 @@ public class CsvWriter implements ICsvWriter {
 				f.setAccessible(false);
 			}
 		}
-		sb.append("\n");
+		sb.append(System.lineSeparator());
 		return sb.toString();
 	}
 
@@ -60,19 +60,24 @@ public class CsvWriter implements ICsvWriter {
 			Field f = fList.get(i);
 			if (isTargetField(f)) {
 				f.setAccessible(true);
-				String name = f.getName();
+				Object val;
+				try {
+					val = f.get(obj);
+				} catch (ReflectiveOperationException e) {
+					throw new RuntimeException(e);
+				}
 				if (i != 0) {
 					sb.append(",");
 				}
 				sb.append("\"");
-				name = columnName(f, name);
-				sb.append(name);
+				sb.append(val);
 				sb.append("\"");
 				f.setAccessible(false);
 			}
 		}
-		sb.append("\n");
+		sb.append(System.lineSeparator());
 		return sb.toString();
+
 	}
 
 	@Override
@@ -118,7 +123,6 @@ public class CsvWriter implements ICsvWriter {
 			bytebuffer.get(bytes);
 			return bytes;
 		} catch (CharacterCodingException e) {
-			// TODO 自動生成された catch ブロック
 			e.printStackTrace();
 		}
 		// 到達不可能
@@ -136,7 +140,7 @@ public class CsvWriter implements ICsvWriter {
 		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
 				: new ArrayList<Field>(Arrays.asList(fields));
 		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
-		if (!isAnnotationNotExist(clazz, TargetSuperClass.class)) {
+		if (!isAnnotationNotExist(clazz, TargetSuperClass.class) || 0 < fields.length) {
 			if (!Object.class.equals(clazz.getSuperclass())) {
 				return getField(clazz.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
 			}
@@ -219,6 +223,7 @@ public class CsvWriter implements ICsvWriter {
 		final StringBuilder sb = new StringBuilder();
 		for (T element : obj) {
 			sb.append(write(element));
+			sb.append(System.lineSeparator());
 		}
 		return sb.toString();
 	}
@@ -228,6 +233,7 @@ public class CsvWriter implements ICsvWriter {
 		final StringBuilder sb = new StringBuilder();
 		for (T element : obj) {
 			sb.append(write(element, cs));
+			sb.append(System.lineSeparator());
 		}
 		return sb.toString();
 	}
