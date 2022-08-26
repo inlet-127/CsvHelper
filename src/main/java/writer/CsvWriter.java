@@ -52,64 +52,43 @@ public class CsvWriter implements ICsvWriter {
 	}
 
 	@Override
-	public String write(Object obj) {
+	public <T> String write(List<T> obj) {
 		Objects.requireNonNull(obj);
-		final List<Field> fList = getField(obj.getClass());
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < fList.size(); i++) {
-			Field f = fList.get(i);
-			if (isTargetField(f)) {
-				f.setAccessible(true);
-				Object val;
-				try {
-					val = f.get(obj);
-				} catch (ReflectiveOperationException e) {
-					throw new RuntimeException(e);
-				}
-				if (i != 0) {
-					sb.append(",");
-				}
-				sb.append("\"");
-				sb.append(val);
-				sb.append("\"");
-				f.setAccessible(false);
-			}
-		}
-		sb.append(System.lineSeparator());
-		return sb.toString();
-
-	}
-
-	@Override
-	public String write(Object obj, Charset cs) {
-		return new String(writeByte(obj, cs), cs);
-	}
-
-	@Override
-	public byte[] writeByte(Object obj, Charset cs) {
-		Objects.requireNonNull(obj);
-		final List<Field> fList = getField(obj.getClass());
-		StringBuilder sb = new StringBuilder(writeHeader(obj.getClass()));
-		for (int i = 0; i < fList.size(); i++) {
-			Field f = fList.get(i);
-			if (isTargetField(f)) {
-				f.setAccessible(true);
-				try {
-					Object value = f.get(obj);
+		final StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < obj.size(); i++) {
+			final List<Field> fList = getField(obj.getClass());
+			for (int j = 0; j < fList.size(); j++) {
+				Field f = fList.get(j);
+				if (isTargetField(f)) {
+					f.setAccessible(true);
+					Object val;
+					try {
+						val = f.get(obj);
+					} catch (ReflectiveOperationException e) {
+						throw new RuntimeException(e);
+					}
 					if (i != 0) {
 						sb.append(",");
 					}
 					sb.append("\"");
-					value = Objects.isNull(value) ? "" : mask(f, value);
-					sb.append(value);
+					sb.append(val);
 					sb.append("\"");
-				} catch (ReflectiveOperationException e) {
-					throw new RuntimeException(e);
+					f.setAccessible(false);
 				}
-				f.setAccessible(false);
 			}
+			sb.append(System.lineSeparator());
 		}
-		return encode(cs, sb.toString());
+		return sb.toString();
+	}
+
+	@Override
+	public <T> String write(List<T> obj, Charset cs) {
+		return new String(writeByte(obj, cs), cs);
+	}
+	
+	@Override
+	public <T> byte[] writeByte(List<T> obj, Charset cs) {
+		return encode(cs, write(obj));
 	}
 
 	@Override
@@ -140,7 +119,7 @@ public class CsvWriter implements ICsvWriter {
 		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
 				: new ArrayList<Field>(Arrays.asList(fields));
 		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
-		if (!isAnnotationNotExist(clazz, TargetSuperClass.class) || 0 < fields.length) {
+		if (!isAnnotationNotExist(clazz, TargetSuperClass.class)) {
 			if (!Object.class.equals(clazz.getSuperclass())) {
 				return getField(clazz.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
 			}
@@ -216,26 +195,6 @@ public class CsvWriter implements ICsvWriter {
 	 */
 	protected <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
 		return ao.getAnnotation(annotationClazz);
-	}
-
-	@Override
-	public <T> String write(List<T> obj) {
-		final StringBuilder sb = new StringBuilder();
-		for (T element : obj) {
-			sb.append(write(element));
-			sb.append(System.lineSeparator());
-		}
-		return sb.toString();
-	}
-
-	@Override
-	public <T> String write(List<T> obj, Charset cs) {
-		final StringBuilder sb = new StringBuilder();
-		for (T element : obj) {
-			sb.append(write(element, cs));
-			sb.append(System.lineSeparator());
-		}
-		return sb.toString();
 	}
 
 }
