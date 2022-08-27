@@ -10,12 +10,16 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import annotations.ColumnName;
 import annotations.Ignore;
 import annotations.Mask;
+import annotations.Order;
 import annotations.TargetSuperClass;
 
 public class CsvWriter {
@@ -28,7 +32,7 @@ public class CsvWriter {
 	 */
 	public static String writeHeader(Class<?> clazz) {
 		Objects.requireNonNull(clazz);
-		final List<Field> fList = getField(clazz);
+		final List<Field> fList = sort(getField(clazz));
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < fList.size(); i++) {
 			Field f = fList.get(i);
@@ -57,14 +61,14 @@ public class CsvWriter {
 			if (i == 0 && isHeaderNeeded) {
 				sb.append(writeHeader(elem.getClass()));
 			}
-			final List<Field> fList = getField(elem.getClass());
+			final List<Field> fList = sort(getField(elem.getClass()));
 			for (int j = 0; j < fList.size(); j++) {
 				Field f = fList.get(j);
 				if (isTargetField(f)) {
 					f.setAccessible(true);
 					Object val;
 					try {
-						val = f.get(elem);
+						val = mask(f, f.get(elem));
 					} catch (ReflectiveOperationException e) {
 						throw new RuntimeException(e);
 					}
@@ -106,8 +110,40 @@ public class CsvWriter {
 		return null;
 	}
 
-//	private <T> List<Field> sort(List<T> targets) {
-//	}
+	/**
+	 * 出力順を制御する
+	 * 
+	 * @param fList
+	 * @return
+	 */
+	private static List<Field> sort(List<Field> fList) {
+		List<Field> result = new ArrayList<>();
+		List<Field> nonAnnotations = new ArrayList<>();
+		Map<Integer, Field> fieldOrderMap = new HashMap<>();
+		for (Field f : fList) {
+			Order annotation = getAnnotation(f, Order.class);
+			if (Objects.isNull(annotation)) {
+				nonAnnotations.add(f);
+			} else {
+				int value = annotation.value();
+				value = Objects.isNull(fieldOrderMap.get(value)) ? value : value + 1;
+				fieldOrderMap.put(value, f);
+			}
+		}
+		if (0 == fieldOrderMap.size()) {
+			return fList;
+		}
+		result.addAll(nonAnnotations);
+		fieldOrderMap = fieldOrderMap.entrySet().stream().sorted(Map.Entry.comparingByKey()).collect(Collectors
+				.toMap(Map.Entry::getKey, Map.Entry::getValue, (oldValue, newValue) -> oldValue, HashMap::new));
+
+		for (Map.Entry<Integer, Field> entry : fieldOrderMap.entrySet()) {
+			int order = entry.getKey();
+			int index = order >= result.size() ? result.size() : order;
+			result.add(index, entry.getValue());
+		}
+		return result;
+	}
 
 	/**
 	 * フィールドを取得
