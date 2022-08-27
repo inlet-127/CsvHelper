@@ -21,6 +21,7 @@ import annotations.Ignore;
 import annotations.Mask;
 import annotations.Order;
 import annotations.TargetSuperClass;
+import annotations.TargetSuperClasses;
 
 /**
  * CSV書き込みクラス
@@ -175,8 +176,7 @@ public class CsvWriter {
 		int previousIndex = -1;
 		for (Map.Entry<Integer, Field> entry : fieldOrderMap.entrySet()) {
 			int order = entry.getKey();
-			int index = order >= result.size() ? result.size()
-					: previousIndex <= order ? order : previousIndex + 1;
+			int index = order >= result.size() ? result.size() : previousIndex <= order ? order : previousIndex + 1;
 			result.add(index, entry.getValue());
 			previousIndex = index;
 		}
@@ -194,10 +194,31 @@ public class CsvWriter {
 		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
 				: new ArrayList<Field>(Arrays.asList(fields));
 		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
+		if (!isAnnotationNotExist(clazz, TargetSuperClasses.class)) {
+			return getParentField(clazz, (Field[]) fieldList.toArray(new Field[] {}));
+		}
 		if (!isAnnotationNotExist(clazz, TargetSuperClass.class)) {
-			if (!Object.class.equals(clazz.getSuperclass())) {
+			if (!Objects.isNull(clazz.getSuperclass()) && !Object.class.equals(clazz.getSuperclass())) {
 				return getField(clazz.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
 			}
+		}
+		return fieldList;
+	}
+
+	/**
+	 * フィールドを取得
+	 * 
+	 * @param <T>
+	 * @param obj
+	 * @return
+	 */
+	private static List<Field> getParentField(Class<?> clazz, Field... fields) {
+		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
+				: new ArrayList<Field>(Arrays.asList(fields));
+		Class<?> superClass = clazz.getSuperclass();
+		if (!Objects.isNull(superClass) && !Object.class.equals(superClass)) {
+			fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getSuperclass().getDeclaredFields())));
+			return getField(superClass.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
 		}
 		return fieldList;
 	}
@@ -245,7 +266,7 @@ public class CsvWriter {
 	 * @return
 	 */
 	private static <T extends Annotation> boolean isAnnotationNotExist(Class<?> clazz, Class<T> annotationClazz) {
-		return Objects.isNull(clazz.getAnnotation(annotationClazz));
+		return Objects.isNull(clazz.getDeclaredAnnotation(annotationClazz));
 	}
 
 	/**
@@ -257,7 +278,7 @@ public class CsvWriter {
 	 * @return
 	 */
 	private static <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao, Class<T> annotationClazz) {
-		return Objects.isNull(ao.getAnnotation(annotationClazz));
+		return Objects.isNull(ao.getDeclaredAnnotation(annotationClazz));
 	}
 
 	/**
@@ -269,7 +290,7 @@ public class CsvWriter {
 	 * @return
 	 */
 	private static <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
-		return ao.getAnnotation(annotationClazz);
+		return ao.getDeclaredAnnotation(annotationClazz);
 	}
 
 }
