@@ -162,7 +162,7 @@ public class CsvWriter {
 			if (Objects.isNull(annotation)) {
 				nonAnnotations.add(f);
 			} else {
-				int value = annotation.value();
+				int value = annotation.value() - 1;
 				value = Objects.isNull(fieldOrderMap.get(value)) ? value : fieldOrderMap.lastKey() + 1;
 				fieldOrderMap.put(value, f);
 			}
@@ -174,7 +174,9 @@ public class CsvWriter {
 
 		int previousIndex = -1;
 		for (Map.Entry<Integer, Field> entry : fieldOrderMap.entrySet()) {
-			int index = entry.getKey() >= result.size() ? result.size() : previousIndex + 1;
+			int order = entry.getKey();
+			int index = order >= result.size() ? result.size()
+					: previousIndex <= order ? order : previousIndex + 1;
 			result.add(index, entry.getValue());
 			previousIndex = index;
 		}
