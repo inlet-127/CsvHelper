@@ -17,9 +17,8 @@ import annotations.ColumnName;
 import annotations.Ignore;
 import annotations.Mask;
 import annotations.TargetSuperClass;
-import writer.base.ICsvWriter;
 
-public class CsvWriter implements ICsvWriter {
+public class CsvWriter {
 
 	/**
 	 * ヘッダを書き込む
@@ -27,8 +26,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param obj
 	 * @return
 	 */
-	@Override
-	public String writeHeader(Class<?> clazz) {
+	public static String writeHeader(Class<?> clazz) {
 		Objects.requireNonNull(clazz);
 		final List<Field> fList = getField(clazz);
 		StringBuilder sb = new StringBuilder();
@@ -51,19 +49,22 @@ public class CsvWriter implements ICsvWriter {
 		return sb.toString();
 	}
 
-	@Override
-	public <T> String write(List<T> obj) {
+	public static <T> String write(List<T> obj, boolean isHeaderNeeded) {
 		Objects.requireNonNull(obj);
 		final StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < obj.size(); i++) {
-			final List<Field> fList = getField(obj.getClass());
+			T elem = obj.get(i);
+			if (i == 0 && isHeaderNeeded) {
+				sb.append(writeHeader(elem.getClass()));
+			}
+			final List<Field> fList = getField(elem.getClass());
 			for (int j = 0; j < fList.size(); j++) {
 				Field f = fList.get(j);
 				if (isTargetField(f)) {
 					f.setAccessible(true);
 					Object val;
 					try {
-						val = f.get(obj);
+						val = f.get(elem);
 					} catch (ReflectiveOperationException e) {
 						throw new RuntimeException(e);
 					}
@@ -81,18 +82,15 @@ public class CsvWriter implements ICsvWriter {
 		return sb.toString();
 	}
 
-	@Override
-	public <T> String write(List<T> obj, Charset cs) {
-		return new String(writeByte(obj, cs), cs);
-	}
-	
-	@Override
-	public <T> byte[] writeByte(List<T> obj, Charset cs) {
-		return encode(cs, write(obj));
+	public static <T> String write(List<T> obj, Charset cs, boolean isHeaderNeeded) {
+		return new String(writeByte(obj, cs, isHeaderNeeded), cs);
 	}
 
-	@Override
-	public byte[] encode(Charset cs, String text) {
+	public static <T> byte[] writeByte(List<T> obj, Charset cs, boolean isHeaderNeeded) {
+		return encode(cs, write(obj, isHeaderNeeded));
+	}
+
+	public static byte[] encode(Charset cs, String text) {
 		Objects.requireNonNull(cs);
 		CharsetEncoder csEncoder = cs.newEncoder();
 		ByteBuffer bytebuffer;
@@ -108,6 +106,9 @@ public class CsvWriter implements ICsvWriter {
 		return null;
 	}
 
+//	private <T> List<Field> sort(List<T> targets) {
+//	}
+
 	/**
 	 * フィールドを取得
 	 * 
@@ -115,7 +116,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param obj
 	 * @return
 	 */
-	protected List<Field> getField(Class<?> clazz, Field... fields) {
+	private static List<Field> getField(Class<?> clazz, Field... fields) {
 		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
 				: new ArrayList<Field>(Arrays.asList(fields));
 		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
@@ -133,7 +134,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param f
 	 * @return
 	 */
-	protected boolean isTargetField(Field f) {
+	private static boolean isTargetField(Field f) {
 		return isAnnotationNotExist(f, Ignore.class);
 	}
 
@@ -144,7 +145,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param value
 	 * @return
 	 */
-	protected Object mask(Field f, Object value) {
+	private static Object mask(Field f, Object value) {
 		Mask mask = getAnnotation(f, Mask.class);
 		return Objects.isNull(mask) ? value : mask.value();
 	}
@@ -156,7 +157,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param value
 	 * @return
 	 */
-	protected String columnName(Field f, String value) {
+	private static String columnName(Field f, String value) {
 		ColumnName columnName = getAnnotation(f, ColumnName.class);
 		return Objects.isNull(columnName) ? value : columnName.value();
 	}
@@ -169,7 +170,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	protected <T extends Annotation> boolean isAnnotationNotExist(Class<?> clazz, Class<T> annotationClazz) {
+	private static <T extends Annotation> boolean isAnnotationNotExist(Class<?> clazz, Class<T> annotationClazz) {
 		return Objects.isNull(clazz.getAnnotation(annotationClazz));
 	}
 
@@ -181,7 +182,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	protected <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao, Class<T> annotationClazz) {
+	private static <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao, Class<T> annotationClazz) {
 		return Objects.isNull(ao.getAnnotation(annotationClazz));
 	}
 
@@ -193,7 +194,7 @@ public class CsvWriter implements ICsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	protected <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
+	private static <T extends Annotation> T getAnnotation(AccessibleObject ao, Class<T> annotationClazz) {
 		return ao.getAnnotation(annotationClazz);
 	}
 
