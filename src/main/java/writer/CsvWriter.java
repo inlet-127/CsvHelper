@@ -10,11 +10,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.TreeMap;
 
 import annotations.ColumnName;
 import annotations.Ignore;
@@ -22,6 +22,9 @@ import annotations.Mask;
 import annotations.Order;
 import annotations.TargetSuperClass;
 
+/**
+ * CSV書き込みクラス
+ */
 public class CsvWriter {
 
 	/**
@@ -39,7 +42,7 @@ public class CsvWriter {
 			if (isTargetField(f)) {
 				f.setAccessible(true);
 				String name = f.getName();
-				if (i != 0) {
+				if (0 < sb.length()) {
 					sb.append(",");
 				}
 				sb.append("\"");
@@ -53,6 +56,14 @@ public class CsvWriter {
 		return sb.toString();
 	}
 
+	/**
+	 * CSV形式の文字列を返却
+	 * 
+	 * @param <T>
+	 * @param obj
+	 * @param isHeaderNeeded
+	 * @return
+	 */
 	public static <T> String write(List<T> obj, boolean isHeaderNeeded) {
 		Objects.requireNonNull(obj);
 		final StringBuilder sb = new StringBuilder();
@@ -62,6 +73,7 @@ public class CsvWriter {
 				sb.append(writeHeader(elem.getClass()));
 			}
 			final List<Field> fList = sort(getField(elem.getClass()));
+			int len = sb.length();
 			for (int j = 0; j < fList.size(); j++) {
 				Field f = fList.get(j);
 				if (isTargetField(f)) {
@@ -72,7 +84,7 @@ public class CsvWriter {
 					} catch (ReflectiveOperationException e) {
 						throw new RuntimeException(e);
 					}
-					if (i != 0) {
+					if (len < sb.length()) {
 						sb.append(",");
 					}
 					sb.append("\"");
@@ -86,14 +98,39 @@ public class CsvWriter {
 		return sb.toString();
 	}
 
+	/**
+	 * 指定した文字コードで変換済みの文字列を返却
+	 * 
+	 * @param <T>
+	 * @param obj
+	 * @param cs
+	 * @param isHeaderNeeded
+	 * @return
+	 */
 	public static <T> String write(List<T> obj, Charset cs, boolean isHeaderNeeded) {
 		return new String(writeByte(obj, cs, isHeaderNeeded), cs);
 	}
 
+	/**
+	 * 指定した文字コードでエンコード済みのバイナリを返却
+	 * 
+	 * @param <T>
+	 * @param obj
+	 * @param cs
+	 * @param isHeaderNeeded
+	 * @return
+	 */
 	public static <T> byte[] writeByte(List<T> obj, Charset cs, boolean isHeaderNeeded) {
 		return encode(cs, write(obj, isHeaderNeeded));
 	}
 
+	/**
+	 * 指定した文字コードでエンコードする
+	 * 
+	 * @param cs
+	 * @param text
+	 * @return
+	 */
 	public static byte[] encode(Charset cs, String text) {
 		Objects.requireNonNull(cs);
 		CharsetEncoder csEncoder = cs.newEncoder();
@@ -119,14 +156,14 @@ public class CsvWriter {
 	private static List<Field> sort(List<Field> fList) {
 		List<Field> result = new ArrayList<>();
 		List<Field> nonAnnotations = new ArrayList<>();
-		Map<Integer, Field> fieldOrderMap = new HashMap<>();
+		NavigableMap<Integer, Field> fieldOrderMap = new TreeMap<>();
 		for (Field f : fList) {
 			Order annotation = getAnnotation(f, Order.class);
 			if (Objects.isNull(annotation)) {
 				nonAnnotations.add(f);
 			} else {
 				int value = annotation.value();
-				value = Objects.isNull(fieldOrderMap.get(value)) ? value : value + 1;
+				value = Objects.isNull(fieldOrderMap.get(value)) ? value : fieldOrderMap.lastKey() + 1;
 				fieldOrderMap.put(value, f);
 			}
 		}
@@ -134,13 +171,12 @@ public class CsvWriter {
 			return fList;
 		}
 		result.addAll(nonAnnotations);
-		fieldOrderMap = fieldOrderMap.entrySet().stream().sorted(Map.Entry.comparingByKey()).collect(Collectors
-				.toMap(Map.Entry::getKey, Map.Entry::getValue, (oldValue, newValue) -> oldValue, HashMap::new));
 
+		int previousIndex = -1;
 		for (Map.Entry<Integer, Field> entry : fieldOrderMap.entrySet()) {
-			int order = entry.getKey();
-			int index = order >= result.size() ? result.size() : order;
+			int index = entry.getKey() >= result.size() ? result.size() : previousIndex + 1;
 			result.add(index, entry.getValue());
+			previousIndex = index;
 		}
 		return result;
 	}
