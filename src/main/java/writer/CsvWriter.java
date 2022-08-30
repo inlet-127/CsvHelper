@@ -28,6 +28,19 @@ import annotations.TargetSuperClasses;
  */
 public class CsvWriter {
 
+	public static void main(String... a) {
+		Sample s = new Sample();
+		s.id = 1;
+		s.name = "sample";
+		s.text = "sample text";
+		s.oyaId = 2;
+		s.oyaName = "sample1";
+		s.oyaText = "sample1 text";
+		List<Sample> list = new ArrayList<>();
+		list.add(s);
+		System.out.println(write(list, true));
+	}
+
 	/**
 	 * ヘッダを書き込む
 	 * 
@@ -194,10 +207,10 @@ public class CsvWriter {
 		List<Field> fieldList = fields.length == 0 ? new ArrayList<Field>()
 				: new ArrayList<Field>(Arrays.asList(fields));
 		fieldList.addAll(new ArrayList<Field>(Arrays.asList(clazz.getDeclaredFields())));
-		if (!isAnnotationNotExist(clazz, TargetSuperClasses.class)) {
+		if (isAnnotationExist(clazz, TargetSuperClasses.class)) {
 			return getParentField(clazz, (Field[]) fieldList.toArray(new Field[] {}));
 		}
-		if (!isAnnotationNotExist(clazz, TargetSuperClass.class)) {
+		if (isAnnotationExist(clazz, TargetSuperClass.class)) {
 			if (!Objects.isNull(clazz.getSuperclass()) && !Object.class.equals(clazz.getSuperclass())) {
 				return getField(clazz.getSuperclass(), (Field[]) fieldList.toArray(new Field[] {}));
 			}
@@ -230,7 +243,7 @@ public class CsvWriter {
 	 * @return
 	 */
 	private static boolean isTargetField(Field f) {
-		return isAnnotationNotExist(f, Ignore.class);
+		return !isAnnotationExist(f, Ignore.class);
 	}
 
 	/**
@@ -265,8 +278,8 @@ public class CsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	private static <T extends Annotation> boolean isAnnotationNotExist(Class<?> clazz, Class<T> annotationClazz) {
-		return Objects.isNull(clazz.getDeclaredAnnotation(annotationClazz));
+	private static <T extends Annotation> boolean isAnnotationExist(Class<?> clazz, Class<T> annotationClazz) {
+		return !Objects.isNull(clazz.getDeclaredAnnotation(annotationClazz));
 	}
 
 	/**
@@ -277,8 +290,8 @@ public class CsvWriter {
 	 * @param annotationClazz
 	 * @return
 	 */
-	private static <T extends Annotation> boolean isAnnotationNotExist(AccessibleObject ao, Class<T> annotationClazz) {
-		return Objects.isNull(ao.getDeclaredAnnotation(annotationClazz));
+	private static <T extends Annotation> boolean isAnnotationExist(AccessibleObject ao, Class<T> annotationClazz) {
+		return !Objects.isNull(ao.getDeclaredAnnotation(annotationClazz));
 	}
 
 	/**
